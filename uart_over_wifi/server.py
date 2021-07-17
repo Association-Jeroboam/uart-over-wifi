@@ -7,7 +7,7 @@ import sys
 import glob
 
 config = None
-sio = socketio.AsyncServer()
+sio = socketio.AsyncServer(max_http_buffer_size=10**100)
 app = aiohttp.web.Application()
 sio.attach(app)
 
@@ -18,6 +18,10 @@ def connect(sid, environ):
     print(f"Client connected: {sid}")
 
 @sio.event
+def disconnect(sid):
+    print(f'Client disconnected: {sid}')
+
+@sio.event
 async def message(sid, data):
     print(f"[RECV] {data}")
 
@@ -26,13 +30,20 @@ async def message(sid, data):
         return
 
     try:
-        serial_port.write(data)
+        serial_port.write(data.encode())
     except Exception as err:
         print(f"Could not write to port: {err}")
 
 @sio.event
-def disconnect(sid):
-    print(f'Client disconnected: {sid}')
+async def flash(sid, data):
+    await run_shell_cmd("mkdir -p build")
+    
+    with open("./build/build.tar.gz", "wb") as f:
+        f.write(data)
+
+    await run_shell_cmd("cd build && tar -xzf build.tar.gz")
+    await run_shell_cmd("ls build")
+    return await run_shell_cmd('cd build && openocd -s ./cfg -c "set BIN_FILE build/MotionBoard.bin" -f flash.cfg')
 
 async def send_message(data):
     global sio
@@ -90,10 +101,23 @@ def close_serial():
     except Exception as err:
         print(f"Could not close serial port: {err}", file=sys.stderr)
 
-async def test_send():
-    while True:
-        await send_message("ping".encode())
-        await asyncio.sleep(0.01)
+async def run_shell_cmd(cmd):
+    print(f'Running shell cmd: {cmd}')
+
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+
+    stdout, stderr = await proc.communicate()
+
+    print(f'[{cmd!r} exited with {proc.returncode}]')
+    if stdout:
+        print(f'[stdout]\n{stdout.decode()}')
+    if stderr:
+        print(f'[stderr]\n{stderr.decode()}')
+
+    return (proc.returncode, stdout.decode(), stderr.decode())
 
 async def start_server(host, port):
     try:
