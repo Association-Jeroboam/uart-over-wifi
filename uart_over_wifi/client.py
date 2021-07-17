@@ -6,20 +6,53 @@ import pty
 import argparse
 import sys
 import fcntl
+import struct
 
 sio = socketio.AsyncClient()
 serial_port = None
+data_stream_started = False
+byte_buffer = bytearray()
+synchro_word = b'\xef\xbe\xad\xde'
+data_frame = bytearray(68)
 
+def extract():
+    global byte_buffer
+
+    idx = byte_buffer.find(synchro_word)
+    if idx > -1:
+        if len(byte_buffer) >= idx + len(synchro_word) + len(data_frame):
+            frame = byte_buffer[idx+len(synchro_word):idx+len(synchro_word)+len(data_frame)]
+            byte_buffer = byte_buffer[idx+len(synchro_word)+len(data_frame):]
+            data = struct.unpack("<Iffffffffffffffff", bytes(frame))
+            return data
+
+    return None
 @sio.event
 async def connect():
     print('Connected to server.')
 
 @sio.event
 async def message(data):
-    try:
-        print(f"[RECV] {data.decode()}")
-    except UnicodeDecodeError:
-        print(f"[RECV] {data}")
+    global data_stream_started
+    global byte_buffer
+
+    if not data_stream_started:
+        try:
+            print(f"[RECV] {data.decode()}")
+        except UnicodeDecodeError:
+            data_stream_started = True
+    else:
+        ba = bytearray(data)
+        byte_buffer.extend(ba)
+
+
+        data = extract()
+        while data is not None:
+            print(f"[RECV] {data}")
+            data = extract()
+
+
+
 
 @sio.event
 async def disconnect():
@@ -35,8 +68,16 @@ async def send_message(data):
         print(f"Could not send message: {err}", file=sys.stderr)
 
 async def send_input():
+    global data_stream_started
+
     while True:
         line = await ainput(">>>")
+
+        if line == "data_stream start":
+            data_stream_started = True
+        elif line == "data_stream stop":
+            data_stream_started = False
+
         await send_message(line + "\r\n")
 
 async def flash(path):

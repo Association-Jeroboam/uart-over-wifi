@@ -1,4 +1,4 @@
-git# uart-over-wifi
+# uart-over-wifi
 ## Dependencies
 ### Pyenv
 ```bash
@@ -178,5 +178,7 @@ poetry run python uart_over_wifi/client.py [ip] [port]
 
 ### Flash
 ```
-poetry run python uart_over_wifi/client.py --flash [path.tar.gz] [ip] [port]
+tar -czvf build.tar.gz -C ../MotionBoardFirmware/firmware/src/hardware/robot ./cfg ./build/MotionBoard.bin
+
+poetry run python uart_over_wifi/client.py --flash ./build.tar.gz [ip] [port]
 ```
