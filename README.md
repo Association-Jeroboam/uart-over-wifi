@@ -2,6 +2,8 @@
 ## Dependencies
 ### Pyenv
 ```bash
+sudo apt install libbz2-dev libreadline-dev libffi-dev
+
 curl https://pyenv.run | bash
 
 echo 'export PYENV_ROOT="$HOME/.pyenv"
