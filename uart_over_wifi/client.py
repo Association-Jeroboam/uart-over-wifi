@@ -38,7 +38,7 @@ async def message(data):
 
     if not data_stream_started:
         try:
-            print(f"[RECV] {data.decode()}")
+            print(f"{data.decode()}", end="")
         except UnicodeDecodeError:
             data_stream_started = True
     else:
@@ -48,7 +48,7 @@ async def message(data):
 
         data = extract()
         while data is not None:
-            print(f"[RECV] {data}")
+            print(f"{data}", end="")
             data = extract()
 
 
@@ -63,7 +63,7 @@ async def send_message(data):
 
     try:
         await sio.emit('message', data)
-        print(f'[SEND] {data}')
+        print(f'{data}', end="")
     except Exception as err:
         print(f"Could not send message: {err}", file=sys.stderr)
 
